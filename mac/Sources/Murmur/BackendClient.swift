@@ -26,7 +26,15 @@ actor BackendClient {
     }
 
     func stopRecording() async throws -> TranscriptResponse {
-        let data = try await post(path: "stop_recording")
+        var req = URLRequest(url: base.appendingPathComponent("stop_recording"))
+        req.httpMethod = "POST"
+        req.timeoutInterval = 30.0  // backend crash shouldn't freeze the app for 60s
+        let (data, response) = try await session.data(for: req)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            let body = String(data: data, encoding: .utf8) ?? "<non-utf8>"
+            throw NSError(domain: "BackendClient", code: (response as? HTTPURLResponse)?.statusCode ?? -1,
+                          userInfo: [NSLocalizedDescriptionKey: body])
+        }
         return try JSONDecoder().decode(TranscriptResponse.self, from: data)
     }
 

@@ -19,6 +19,7 @@ final class PillController: ObservableObject {
     private let backend = BackendClient()
     private var stopTask: Task<Void, Never>?
     private var levelPoller: Task<Void, Never>?
+    private var watchdog: Task<Void, Never>?
     private var targetApp: NSRunningApplication?
 
     func startRecording() {
@@ -39,6 +40,13 @@ final class PillController: ObservableObject {
         guard case .recording = state else { return }
         levelPoller?.cancel()
         state = .processing
+        // Safety net: if the backend crashes and never responds, reset after 35s
+        // (slightly longer than the 30s network timeout so the error surfaces first).
+        watchdog = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 35_000_000_000)
+            guard let self, !Task.isCancelled else { return }
+            if case .processing = self.state { self.setError("timed out") }
+        }
         stopTask = Task { [weak self] in
             guard let self else { return }
             do {
@@ -51,6 +59,7 @@ final class PillController: ObservableObject {
                 let pb = NSPasteboard.general
                 pb.clearContents()
                 pb.setString(result.polished, forType: .string)
+                self.watchdog?.cancel()
                 self.state = .done
                 // Re-activate the app the user was in before recording.
                 // Without this, focus can be anywhere after 1-4s of processing.
@@ -60,6 +69,7 @@ final class PillController: ObservableObject {
                 try? await Task.sleep(nanoseconds: 600_000_000)
                 if !Task.isCancelled { self.hide() }
             } catch {
+                self.watchdog?.cancel()
                 self.setError("stop failed: \(error.localizedDescription)")
             }
         }
