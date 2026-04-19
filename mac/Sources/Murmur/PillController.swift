@@ -22,18 +22,32 @@ final class PillController: ObservableObject {
     private var levelPoller: Task<Void, Never>?
     private var watchdog: Task<Void, Never>?
     private var targetApp: NSRunningApplication?
+    // True only after backend confirmed recording started. Guards against
+    // sending stop when start never completed (rapid press, start error, etc.)
+    private var backendIsRecording = false
 
     func startRecording() {
+        // Cancel everything from any previous cycle before starting fresh.
+        startTask?.cancel()
         stopTask?.cancel()
+        watchdog?.cancel()
+        levelPoller?.cancel()
+        backendIsRecording = false
         level = 0.0
-        // Capture which app the user was in before we show the pill.
         targetApp = NSWorkspace.shared.frontmostApplication
         state = .recording(since: Date())
         show()
-        startTask = Task {
-            do { try await backend.startRecording() }
-            catch { setError("start failed: \(error.localizedDescription)"); return }
-            startLevelPolling()
+        startTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await backend.startRecording()
+                guard !Task.isCancelled else { return }
+                self.backendIsRecording = true
+                self.startLevelPolling()
+            } catch {
+                guard !Task.isCancelled else { return }
+                self.setError("start failed: \(error.localizedDescription)")
+            }
         }
     }
 
@@ -41,8 +55,6 @@ final class PillController: ObservableObject {
         guard case .recording = state else { return }
         levelPoller?.cancel()
         state = .processing
-        // Safety net: if the backend crashes and never responds, reset after 35s
-        // (slightly longer than the 30s network timeout so the error surfaces first).
         watchdog = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 35_000_000_000)
             guard let self, !Task.isCancelled else { return }
@@ -51,10 +63,15 @@ final class PillController: ObservableObject {
         let capturedStartTask = startTask
         stopTask = Task { [weak self] in
             guard let self else { return }
-            // Wait for start_recording to complete before sending stop.
-            // Prevents a race when the hotkey is released very quickly.
+            // Wait for start to finish before sending stop.
             await capturedStartTask?.value
-            guard !Task.isCancelled else { return }
+            // If cancelled (new press came in) or start never reached backend, just hide.
+            guard !Task.isCancelled, self.backendIsRecording else {
+                self.watchdog?.cancel()
+                self.hide()
+                return
+            }
+            self.backendIsRecording = false
             do {
                 let result = try await self.backend.stopRecording()
                 if let t = result.elapsed_ms {
