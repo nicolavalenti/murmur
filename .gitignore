@@ -1,0 +1,25 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Swift / Xcode
+.build/
+.swiftpm/
+*.xcodeproj
+Package.resolved
+
+# Murmur runtime (user config — never commit)
+.murmur/
+
+# Logs
+*.log
