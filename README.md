@@ -1,8 +1,8 @@
 # murmur
 
-AI-powered push-to-talk dictation for macOS (Apple Silicon). Hold a hotkey, speak, release — polished text lands wherever your cursor is.
+AI-powered push-to-talk dictation for macOS (Apple Silicon). Hold a hotkey, speak, release. Polished text lands wherever your cursor is.
 
-Transcription runs on-device via [mlx-whisper](https://github.com/ml-explore/mlx-examples) (fast, no audio leaves your Mac). An LLM via [OpenRouter](https://openrouter.ai) cleans up the transcript — fixing punctuation, removing filler words, preserving your tone.
+Transcription runs on-device via [mlx-whisper](https://github.com/ml-explore/mlx-examples), so no audio ever leaves your Mac. An LLM via [OpenRouter](https://openrouter.ai) cleans up the transcript: fixing punctuation, removing filler words, preserving your tone. Total cost is fractions of a cent per dictation, compared to $15/month for tools like Wispr Flow.
 
 ![macOS 13+](https://img.shields.io/badge/macOS-13%2B-black) ![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-required-red)
 
