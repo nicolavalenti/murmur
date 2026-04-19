@@ -22,7 +22,7 @@ actor BackendClient {
     }()
 
     func startRecording() async throws {
-        // Retry a few times on connection failure — backend may still be starting up.
+        // Retry on connection failures — backend may still be starting up after launch.
         let delays: [UInt64] = [0, 500, 1000, 2000]
         var lastError: Error?
         for delay in delays {
@@ -30,12 +30,14 @@ actor BackendClient {
             do {
                 _ = try await post(path: "start_recording")
                 return
-            } catch let error as NSError where error.code == NSURLErrorCannotConnectToHost
-                                              || error.code == NSURLErrorNetworkConnectionLost {
+            } catch let error as NSError
+                where error.domain == NSURLErrorDomain && error.code != NSURLErrorCancelled {
+                // Any URL-layer error (connection refused, network lost, timeout)
+                // during startup — retry. App-level errors (4xx/5xx) fall through.
                 lastError = error
             }
         }
-        throw lastError!
+        throw lastError ?? NSError(domain: NSURLErrorDomain, code: NSURLErrorCannotConnectToHost)
     }
 
     func stopRecording() async throws -> TranscriptResponse {

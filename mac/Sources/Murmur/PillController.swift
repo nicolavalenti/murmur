@@ -78,13 +78,13 @@ final class PillController: ObservableObject {
                     print("[murmur] swift received — transcribe: \(t["transcribe"] ?? -1)ms  polish: \(t["polish"] ?? -1)ms  total: \(t["total"] ?? -1)ms")
                 }
                 let pb = NSPasteboard.general
-                // Save all clipboard types so we can fully restore after pasting.
-                let savedItems: [[NSPasteboard.PasteboardType: Data]] = (pb.pasteboardItems ?? []).map { item in
-                    var saved: [NSPasteboard.PasteboardType: Data] = [:]
-                    for type in item.types {
-                        if let data = item.data(forType: type) { saved[type] = data }
+                // Read data directly from the pasteboard (not from items) —
+                // this forces lazy/rich-text providers to materialise.
+                var savedData: [(NSPasteboard.PasteboardType, Data)] = []
+                for type in pb.types ?? [] {
+                    if let data = pb.data(forType: type) {
+                        savedData.append((type, data))
                     }
-                    return saved
                 }
                 pb.clearContents()
                 pb.setString(result.polished, forType: .string)
@@ -93,17 +93,11 @@ final class PillController: ObservableObject {
                 self.targetApp?.activate(options: .activateIgnoringOtherApps)
                 try? await Task.sleep(nanoseconds: 200_000_000)
                 Paster.pasteCommandV()
-                // Give the target app ~150ms to process the paste event,
-                // then restore immediately so the user's clipboard is back.
+                // Give the target app 150ms to consume the paste, then restore.
                 try? await Task.sleep(nanoseconds: 150_000_000)
                 pb.clearContents()
-                if !savedItems.isEmpty {
-                    let restoredItems = savedItems.map { saved -> NSPasteboardItem in
-                        let item = NSPasteboardItem()
-                        for (type, data) in saved { item.setData(data, forType: type) }
-                        return item
-                    }
-                    pb.writeObjects(restoredItems)
+                for (type, data) in savedData {
+                    pb.setData(data, forType: type)
                 }
                 try? await Task.sleep(nanoseconds: 450_000_000)
                 if !Task.isCancelled { self.hide() }
