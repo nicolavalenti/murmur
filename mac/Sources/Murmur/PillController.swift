@@ -93,16 +93,19 @@ final class PillController: ObservableObject {
                 self.targetApp?.activate(options: .activateIgnoringOtherApps)
                 try? await Task.sleep(nanoseconds: 200_000_000)
                 Paster.pasteCommandV()
-                // Wait for the paste to land, then restore the original clipboard.
-                try? await Task.sleep(nanoseconds: 600_000_000)
+                // Give the target app ~150ms to process the paste event,
+                // then restore immediately so the user's clipboard is back.
+                try? await Task.sleep(nanoseconds: 150_000_000)
                 pb.clearContents()
                 if !savedItems.isEmpty {
-                    for saved in savedItems {
+                    let restoredItems = savedItems.map { saved -> NSPasteboardItem in
                         let item = NSPasteboardItem()
                         for (type, data) in saved { item.setData(data, forType: type) }
-                        pb.writeObjects([item])
+                        return item
                     }
+                    pb.writeObjects(restoredItems)
                 }
+                try? await Task.sleep(nanoseconds: 450_000_000)
                 if !Task.isCancelled { self.hide() }
             } catch {
                 self.watchdog?.cancel()
