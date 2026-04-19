@@ -1,8 +1,8 @@
 # murmur
 
-A local, privacy-first dictation tool for macOS (Apple Silicon). Hold a hotkey, speak, release — polished text lands wherever your cursor is.
+AI-powered push-to-talk dictation for macOS (Apple Silicon). Hold a hotkey, speak, release — polished text lands wherever your cursor is.
 
-Built as an open alternative to Wispr Flow. All transcription runs on-device via [mlx-whisper](https://github.com/ml-explore/mlx-examples). Text polishing goes through [OpenRouter](https://openrouter.ai) (one API call per dictation).
+Transcription runs on-device via [mlx-whisper](https://github.com/ml-explore/mlx-examples) (fast, no audio leaves your Mac). An LLM via [OpenRouter](https://openrouter.ai) cleans up the transcript — fixing punctuation, removing filler words, preserving your tone.
 
 ![macOS 13+](https://img.shields.io/badge/macOS-13%2B-black) ![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-required-red)
 
