@@ -2,6 +2,8 @@ import threading
 import numpy as np
 import sounddevice as sd
 
+_MAX_RECORDING_SECONDS = 120  # safety limit — releases mic if client disappears
+
 
 class Recorder:
     """Push-to-talk audio recorder. Captures to an in-memory float32 buffer at
@@ -14,6 +16,7 @@ class Recorder:
         self._frames: list[np.ndarray] = []
         self._stream: sd.InputStream | None = None
         self._lock = threading.Lock()
+        self._watchdog: threading.Timer | None = None
 
     def _callback(self, indata, frames, time_info, status) -> None:
         if status:
@@ -33,17 +36,37 @@ class Recorder:
             callback=self._callback,
         )
         self._stream.start()
+        self._watchdog = threading.Timer(_MAX_RECORDING_SECONDS, self._timeout)
+        self._watchdog.daemon = True
+        self._watchdog.start()
+
+    def _timeout(self) -> None:
+        print(f"[audio] recording exceeded {_MAX_RECORDING_SECONDS}s — auto-stopping to release mic")
+        self._close_stream()
+
+    def _close_stream(self) -> None:
+        if self._watchdog:
+            self._watchdog.cancel()
+            self._watchdog = None
+        if self._stream is not None:
+            try:
+                self._stream.stop()
+                self._stream.close()
+            except Exception:
+                pass
+            self._stream = None
 
     def stop(self) -> np.ndarray:
         if self._stream is None:
             raise RuntimeError("recorder not running")
-        self._stream.stop()
-        self._stream.close()
-        self._stream = None
+        self._close_stream()
         with self._lock:
             if not self._frames:
                 return np.zeros(0, dtype=np.float32)
             return np.concatenate(self._frames, axis=0)
+
+    def __del__(self) -> None:
+        self._close_stream()
 
     @property
     def is_running(self) -> bool:
