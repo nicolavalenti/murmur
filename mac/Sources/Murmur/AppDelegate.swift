@@ -97,6 +97,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        let forceQuitItem = NSMenuItem(title: "Force Quit", action: #selector(forceQuit), keyEquivalent: "")
+        forceQuitItem.target = self
+        menu.addItem(forceQuitItem)
         statusItem.menu = menu
     }
 
@@ -106,5 +109,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func openAccessibilitySettings() {
         Paster.requestPermission()
+    }
+
+    @objc private func forceQuit() {
+        backend.stop()
+        exit(0)
     }
 }
