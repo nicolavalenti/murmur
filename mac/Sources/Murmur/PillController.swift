@@ -77,19 +77,22 @@ final class PillController: ObservableObject {
                 if let t = result.elapsed_ms {
                     print("[murmur] swift received — transcribe: \(t["transcribe"] ?? -1)ms  polish: \(t["polish"] ?? -1)ms  total: \(t["total"] ?? -1)ms")
                 }
-                // Set clipboard from Swift — pyperclip can't reach the
-                // macOS pasteboard when Python runs as a child process of a .app.
                 let pb = NSPasteboard.general
+                // Save whatever the user had copied before we clobber the clipboard.
+                let previousClipboard = pb.string(forType: .string)
                 pb.clearContents()
                 pb.setString(result.polished, forType: .string)
                 self.watchdog?.cancel()
                 self.state = .done
-                // Re-activate the app the user was in before recording.
-                // Without this, focus can be anywhere after 1-4s of processing.
                 self.targetApp?.activate(options: .activateIgnoringOtherApps)
                 try? await Task.sleep(nanoseconds: 200_000_000)
                 Paster.pasteCommandV()
+                // Wait for the paste to land, then restore the original clipboard.
                 try? await Task.sleep(nanoseconds: 600_000_000)
+                pb.clearContents()
+                if let previous = previousClipboard {
+                    pb.setString(previous, forType: .string)
+                }
                 if !Task.isCancelled { self.hide() }
             } catch {
                 self.watchdog?.cancel()
