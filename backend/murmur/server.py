@@ -103,7 +103,10 @@ def stop_recording() -> TranscriptResponse:
     )
     t_polish = time.perf_counter()
 
-    pyperclip.copy(polished)
+    try:
+        pyperclip.copy(polished)
+    except Exception:
+        pass  # clipboard is set by the Swift app; this is best-effort only
     t_clip = time.perf_counter()
 
     elapsed = {

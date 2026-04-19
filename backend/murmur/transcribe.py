@@ -14,6 +14,9 @@ def transcribe(audio: np.ndarray, model: str, sample_rate: int = 16000) -> str:
     if sample_rate != 16000:
         raise ValueError("mlx-whisper expects 16kHz audio")
 
+    if audio.size < 1600:  # less than 100ms at 16kHz — nothing to transcribe
+        return ""
+
     audio = audio.astype(np.float32, copy=False)
     result = mlx_whisper.transcribe(audio, path_or_hf_repo=model)
     return (result.get("text") or "").strip()

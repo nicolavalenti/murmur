@@ -22,6 +22,9 @@ final class PillController: ObservableObject {
     private var levelPoller: Task<Void, Never>?
     private var watchdog: Task<Void, Never>?
     private var targetApp: NSRunningApplication?
+    // Clipboard snapshot taken at the moment recording starts — while the source
+    // app is still frontmost and lazy providers can still materialise their data.
+    private var savedClipboard: [(NSPasteboard.PasteboardType, Data)] = []
     // True only after backend confirmed recording started. Guards against
     // sending stop when start never completed (rapid press, start error, etc.)
     private var backendIsRecording = false
@@ -35,6 +38,15 @@ final class PillController: ObservableObject {
         backendIsRecording = false
         level = 0.0
         targetApp = NSWorkspace.shared.frontmostApplication
+
+        // Snapshot clipboard now — source app is still frontmost, so lazy
+        // providers can materialise. Saving later (during processing) is too
+        // late: the app may have yielded background clipboard access by then.
+        let pb = NSPasteboard.general
+        savedClipboard = (pb.types ?? []).compactMap { type in
+            pb.data(forType: type).map { (type, $0) }
+        }
+
         state = .recording(since: Date())
         show()
         startTask = Task { [weak self] in
@@ -78,14 +90,9 @@ final class PillController: ObservableObject {
                     print("[murmur] swift received — transcribe: \(t["transcribe"] ?? -1)ms  polish: \(t["polish"] ?? -1)ms  total: \(t["total"] ?? -1)ms")
                 }
                 let pb = NSPasteboard.general
-                // Read data directly from the pasteboard (not from items) —
-                // this forces lazy/rich-text providers to materialise.
-                var savedData: [(NSPasteboard.PasteboardType, Data)] = []
-                for type in pb.types ?? [] {
-                    if let data = pb.data(forType: type) {
-                        savedData.append((type, data))
-                    }
-                }
+                // Clipboard was already saved at startRecording() time, while
+                // the source app was still frontmost. Use that snapshot.
+                let clipboardSnapshot = self.savedClipboard
                 pb.clearContents()
                 pb.setString(result.polished, forType: .string)
                 self.watchdog?.cancel()
@@ -96,8 +103,12 @@ final class PillController: ObservableObject {
                 // Give the target app 150ms to consume the paste, then restore.
                 try? await Task.sleep(nanoseconds: 150_000_000)
                 pb.clearContents()
-                for (type, data) in savedData {
-                    pb.setData(data, forType: type)
+                if !clipboardSnapshot.isEmpty {
+                    let types = clipboardSnapshot.map { $0.0 }
+                    pb.declareTypes(types, owner: nil)
+                    for (type, data) in clipboardSnapshot {
+                        pb.setData(data, forType: type)
+                    }
                 }
                 try? await Task.sleep(nanoseconds: 450_000_000)
                 if !Task.isCancelled { self.hide() }

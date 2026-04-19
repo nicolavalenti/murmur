@@ -28,6 +28,18 @@ struct PillView: View {
                 .scaleEffect(pillScale)
                 .opacity(pillOpacity)
         }
+        .onAppear {
+            // If the window is created while already in .recording state (first use),
+            // onChange won't fire — trigger the animation manually here.
+            if case .recording = controller.state {
+                pillScale = 0.4
+                pillOpacity = 0.0
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.6)) {
+                    pillScale = 1.0
+                    pillOpacity = 1.0
+                }
+            }
+        }
         .onChange(of: controller.state) { newState in
             switch newState {
             case .recording:
