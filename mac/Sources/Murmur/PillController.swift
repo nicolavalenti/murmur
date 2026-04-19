@@ -17,6 +17,7 @@ final class PillController: ObservableObject {
 
     private var window: NSWindow?
     private let backend = BackendClient()
+    private var startTask: Task<Void, Never>?
     private var stopTask: Task<Void, Never>?
     private var levelPoller: Task<Void, Never>?
     private var watchdog: Task<Void, Never>?
@@ -29,7 +30,7 @@ final class PillController: ObservableObject {
         targetApp = NSWorkspace.shared.frontmostApplication
         state = .recording(since: Date())
         show()
-        Task {
+        startTask = Task {
             do { try await backend.startRecording() }
             catch { setError("start failed: \(error.localizedDescription)"); return }
             startLevelPolling()
@@ -47,8 +48,13 @@ final class PillController: ObservableObject {
             guard let self, !Task.isCancelled else { return }
             if case .processing = self.state { self.setError("timed out") }
         }
+        let capturedStartTask = startTask
         stopTask = Task { [weak self] in
             guard let self else { return }
+            // Wait for start_recording to complete before sending stop.
+            // Prevents a race when the hotkey is released very quickly.
+            await capturedStartTask?.value
+            guard !Task.isCancelled else { return }
             do {
                 let result = try await self.backend.stopRecording()
                 if let t = result.elapsed_ms {
