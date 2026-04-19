@@ -74,7 +74,8 @@ def update_settings(patch: SettingsPatch) -> dict[str, Any]:
 def start_recording() -> dict[str, Any]:
     global _recorder
     if _recorder is not None and _recorder.is_running:
-        raise HTTPException(status_code=409, detail="already recording")
+        _recorder.stop()  # force-clear a ghost recording (e.g. after app crash)
+        _recorder = None
     _recorder = Recorder(sample_rate=_cfg["sample_rate"], gain=_cfg.get("input_gain", 1.0))
     _recorder.start()
     return {"recording": True, "started_at": time.time()}
