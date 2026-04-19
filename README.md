@@ -2,7 +2,7 @@
 
 AI-powered push-to-talk dictation for macOS (Apple Silicon). Hold a hotkey, speak, release. Polished text lands wherever your cursor is.
 
-Transcription runs on-device via [mlx-whisper](https://github.com/ml-explore/mlx-examples), so no audio ever leaves your Mac. An LLM via [OpenRouter](https://openrouter.ai) cleans up the transcript: fixing punctuation, removing filler words, preserving your tone. Total API cost runs around $0.30/month at typical daily use, compared to $15/month for tools like Wispr Flow.
+Transcription runs on-device via [mlx-whisper](https://github.com/ml-explore/mlx-examples), so no audio ever leaves your Mac. An LLM via [OpenRouter](https://openrouter.ai) cleans up the transcript: fixing punctuation, removing filler words, preserving your tone. Total API cost runs around $0.30/month at typical daily use: 50x cheaper than Wispr Flow ($15/month). Latency is 1-2 seconds end-to-end, comparable to Wispr Flow and significantly faster than other open-source alternatives that run Whisper on CPU.
 
 ![macOS 13+](https://img.shields.io/badge/macOS-13%2B-black) ![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-required-red)
 
