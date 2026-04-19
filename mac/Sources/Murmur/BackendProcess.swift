@@ -21,6 +21,14 @@ final class BackendProcess {
         guard task == nil || task?.isRunning == false else { return }
         task = nil
 
+        // Kill any orphaned murmur-server processes from previous crashes
+        // before spawning a new one. Prevents mic accumulation across restarts.
+        let killer = Process()
+        killer.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
+        killer.arguments = ["-f", "murmur-server"]
+        try? killer.run()
+        killer.waitUntilExit()
+
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: "/bin/zsh")
         // -lc: login shell so PATH/rc files load, then run our command.
