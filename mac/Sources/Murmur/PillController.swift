@@ -78,8 +78,14 @@ final class PillController: ObservableObject {
                     print("[murmur] swift received — transcribe: \(t["transcribe"] ?? -1)ms  polish: \(t["polish"] ?? -1)ms  total: \(t["total"] ?? -1)ms")
                 }
                 let pb = NSPasteboard.general
-                // Save whatever the user had copied before we clobber the clipboard.
-                let previousClipboard = pb.string(forType: .string)
+                // Save all clipboard types so we can fully restore after pasting.
+                let savedItems: [[NSPasteboard.PasteboardType: Data]] = (pb.pasteboardItems ?? []).map { item in
+                    var saved: [NSPasteboard.PasteboardType: Data] = [:]
+                    for type in item.types {
+                        if let data = item.data(forType: type) { saved[type] = data }
+                    }
+                    return saved
+                }
                 pb.clearContents()
                 pb.setString(result.polished, forType: .string)
                 self.watchdog?.cancel()
@@ -90,8 +96,12 @@ final class PillController: ObservableObject {
                 // Wait for the paste to land, then restore the original clipboard.
                 try? await Task.sleep(nanoseconds: 600_000_000)
                 pb.clearContents()
-                if let previous = previousClipboard {
-                    pb.setString(previous, forType: .string)
+                if !savedItems.isEmpty {
+                    for saved in savedItems {
+                        let item = NSPasteboardItem()
+                        for (type, data) in saved { item.setData(data, forType: type) }
+                        pb.writeObjects([item])
+                    }
                 }
                 if !Task.isCancelled { self.hide() }
             } catch {
