@@ -23,9 +23,10 @@ final class BackendProcess {
 
         // Kill any orphaned murmur-server processes from previous crashes
         // before spawning a new one. Prevents mic accumulation across restarts.
+        // Use SIGKILL (-9) since SIGTERM is sometimes ignored by uvicorn workers.
         let killer = Process()
         killer.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
-        killer.arguments = ["-f", "murmur-server"]
+        killer.arguments = ["-9", "-f", "murmur-server"]
         try? killer.run()
         killer.waitUntilExit()
 
