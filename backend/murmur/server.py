@@ -84,8 +84,10 @@ def start_recording() -> dict[str, Any]:
 @app.post("/stop_recording", response_model=TranscriptResponse)
 def stop_recording() -> TranscriptResponse:
     global _recorder
-    if _recorder is None or not _recorder.is_running:
+    if _recorder is None:
         raise HTTPException(status_code=409, detail="not recording")
+    # recorder may have been auto-stopped by the watchdog (max duration exceeded)
+    # but frames are still in memory — proceed to transcribe what was captured
 
     t0 = time.perf_counter()
     audio = _recorder.stop()

@@ -11,6 +11,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var settingsWindow = SettingsWindowController(store: settingsStore)
     private var cancellables = Set<AnyCancellable>()
 
+    // Dual-mode recording: hold (press+hold) and toggle (double-tap, hands-free)
+    private enum RecordingMode { case none, hold, toggle }
+    private var recordingMode: RecordingMode = .none
+    private var stopGraceTask: Task<Void, Never>?
+    private let doubleTapWindow: TimeInterval = 0.35
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         backend.start()
         settingsStore.refreshModel()
@@ -21,10 +27,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             key: settingsStore.hotkeyKey,
             modifiers: settingsStore.modifiers,
             onPress: { [weak self] in
-                Task { @MainActor in self?.pillController.startRecording() }
+                Task { @MainActor in self?.handleHotkeyPress() }
             },
             onRelease: { [weak self] in
-                Task { @MainActor in self?.pillController.stopRecording() }
+                Task { @MainActor in self?.handleHotkeyRelease() }
             }
         )
 
@@ -60,6 +66,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         settingsWindow.show()
         return true
+    }
+
+    private func handleHotkeyPress() {
+        // Cancel any pending grace-period stop — a new keyDown arrived in time.
+        stopGraceTask?.cancel()
+        stopGraceTask = nil
+
+        switch recordingMode {
+        case .toggle:
+            // Single press stops hands-free recording.
+            recordingMode = .none
+            pillController.stopRecording()
+
+        case .hold:
+            // Second tap while grace window is open → go hands-free.
+            // Recording continues uninterrupted; we just drop the scheduled stop.
+            recordingMode = .toggle
+
+        case .none:
+            // First press → start recording in hold mode.
+            recordingMode = .hold
+            pillController.startRecording()
+        }
+    }
+
+    private func handleHotkeyRelease() {
+        guard recordingMode == .hold else { return }
+
+        // Open a grace window: if the user taps again within the double-tap
+        // interval, handleHotkeyPress cancels this task and switches to toggle
+        // mode instead of stopping. Otherwise we stop normally.
+        stopGraceTask = Task { [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(nanoseconds: UInt64(self.doubleTapWindow * 1_000_000_000))
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                if self.recordingMode == .hold {
+                    self.recordingMode = .none
+                    self.pillController.stopRecording()
+                }
+            }
+        }
     }
 
     private func showAccessibilityAlert() {

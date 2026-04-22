@@ -2,6 +2,8 @@ import SwiftUI
 
 private let offWhite = Color(red: 0.94, green: 0.94, blue: 0.94)
 private let pillBlack = Color(red: 0.04, green: 0.04, blue: 0.04)
+private let warningRed = Color(red: 1.0, green: 0.27, blue: 0.27)
+private let warningThreshold = 570  // 9 min 30 sec — matches 600s backend limit
 
 private let pillWidth: CGFloat = 124
 private let pillHeight: CGFloat = 26
@@ -97,25 +99,27 @@ private struct RecordingContent: View {
     @State private var pulse = false
 
     var body: some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(offWhite)
-                .frame(width: 5, height: 5)
-                .opacity(pulse ? 0.45 : 1.0)
-                .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulse)
-                .onAppear { pulse = true }
+        TimelineView(.periodic(from: .now, by: 0.25)) { context in
+            let elapsed = max(0, Int(context.date.timeIntervalSince(since)))
+            let isWarning = elapsed >= warningThreshold
+            let tintColor = isWarning ? warningRed : offWhite
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(tintColor)
+                    .frame(width: 5, height: 5)
+                    .opacity(pulse ? 0.45 : 1.0)
+                    .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulse)
 
-            Waveform(level: controller.level)
-                .frame(maxWidth: .infinity)
+                Waveform(level: controller.level)
+                    .frame(maxWidth: .infinity)
 
-            TimelineView(.periodic(from: .now, by: 0.25)) { context in
-                let elapsed = max(0, Int(context.date.timeIntervalSince(since)))
                 Text(String(format: "%d:%02d", elapsed / 60, elapsed % 60))
                     .font(.system(size: 10, weight: .regular, design: .default))
                     .monospacedDigit()
-                    .foregroundColor(offWhite)
+                    .foregroundColor(tintColor)
             }
         }
+        .onAppear { pulse = true }
     }
 }
 

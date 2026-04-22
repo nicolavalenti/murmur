@@ -10,7 +10,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Welcome to Murmur")
                     .font(.system(size: 22, weight: .semibold))
-                Text("Hold your hotkey, speak, release. Text lands wherever your cursor is.")
+                Text("Hold your hotkey to record, or double-tap to go hands-free. Text lands wherever your cursor is.")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }

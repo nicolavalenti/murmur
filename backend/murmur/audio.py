@@ -2,7 +2,7 @@ import threading
 import numpy as np
 import sounddevice as sd
 
-_MAX_RECORDING_SECONDS = 120  # safety limit — releases mic if client disappears
+_MAX_RECORDING_SECONDS = 600  # safety limit — releases mic if client disappears (10 min)
 
 
 class Recorder:
@@ -57,7 +57,7 @@ class Recorder:
             self._stream = None
 
     def stop(self) -> np.ndarray:
-        if self._stream is None:
+        if self._stream is None and not self._frames:
             raise RuntimeError("recorder not running")
         self._close_stream()
         with self._lock:
