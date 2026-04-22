@@ -6,6 +6,8 @@ Transcription runs on-device via [mlx-whisper](https://github.com/ml-explore/mlx
 
 ![macOS 13+](https://img.shields.io/badge/macOS-13%2B-black) ![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-required-red)
 
+![Murmur demo](assets/demo.gif)
+
 ---
 
 ## How it works
