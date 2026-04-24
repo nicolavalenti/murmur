@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from . import config as config_module
 from .audio import Recorder
-from .polish import polish
+from .polish import polish, GROQ_URL
 from .transcribe import transcribe
 
 app = FastAPI(title="murmur", version="0.1.0")
@@ -26,6 +26,7 @@ class TranscriptResponse(BaseModel):
 class SettingsPatch(BaseModel):
     whisper_model: str | None = None
     openrouter_api_key: str | None = None
+    groq_api_key: str | None = None
     polishing_model: str | None = None
     polishing_prompt: str | None = None
     auto_paste: bool | None = None
@@ -58,6 +59,8 @@ def get_settings() -> dict[str, Any]:
     safe = dict(_cfg)
     if safe.get("openrouter_api_key"):
         safe["openrouter_api_key"] = "sk-or-***"
+    if safe.get("groq_api_key"):
+        safe["groq_api_key"] = "gsk-***"
     return safe
 
 
@@ -97,11 +100,15 @@ def stop_recording() -> TranscriptResponse:
     raw = transcribe(audio, model=_cfg["whisper_model"], sample_rate=_cfg["sample_rate"])
     t_trans = time.perf_counter()
 
+    groq_key = _cfg.get("groq_api_key", "")
+    polish_key = groq_key if groq_key else _cfg.get("openrouter_api_key", "")
+    polish_url = GROQ_URL if groq_key else None
     polished = polish(
         raw,
         model=_cfg.get("polishing_model") or None,
-        api_key=_cfg.get("openrouter_api_key", ""),
+        api_key=polish_key,
         prompt=_cfg["polishing_prompt"],
+        **{"url": polish_url} if polish_url else {},
     )
     t_polish = time.perf_counter()
 

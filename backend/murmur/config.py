@@ -9,6 +9,7 @@ CONFIG_PATH = CONFIG_DIR / "config.json"
 DEFAULTS: dict[str, Any] = {
     "whisper_model": "mlx-community/whisper-large-v3-turbo",
     "openrouter_api_key": os.environ.get("OPENROUTER_API_KEY", ""),
+    "groq_api_key": os.environ.get("GROQ_API_KEY", ""),
     "polishing_model": "google/gemini-2.0-flash-001",
     "polishing_prompt": (
         "Clean up this voice transcript. Fix punctuation and capitalization. "

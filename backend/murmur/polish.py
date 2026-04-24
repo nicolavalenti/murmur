@@ -1,9 +1,10 @@
 import httpx
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 
-def polish(transcript: str, model: str | None, api_key: str, prompt: str, timeout: float = 15.0) -> str:
+def polish(transcript: str, model: str | None, api_key: str, prompt: str, timeout: float = 15.0, url: str = OPENROUTER_URL) -> str:
     """Send transcript through an OpenRouter LLM for cleanup.
 
     Passing model=None (or empty string) bypasses polishing and returns the
@@ -30,7 +31,7 @@ def polish(transcript: str, model: str | None, api_key: str, prompt: str, timeou
         "X-Title": "murmur",
     }
     with httpx.Client(timeout=timeout) as client:
-        resp = client.post(OPENROUTER_URL, json=body, headers=headers)
+        resp = client.post(url, json=body, headers=headers)
         if not resp.is_success:
             raise RuntimeError(f"OpenRouter {resp.status_code}: {resp.text}")
         data = resp.json()
