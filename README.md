@@ -2,7 +2,7 @@
 
 AI-powered push-to-talk dictation for macOS (Apple Silicon). Hold a hotkey, speak, release. Polished text lands wherever your cursor is.
 
-Transcription runs on-device via [mlx-whisper](https://github.com/ml-explore/mlx-examples), so no audio ever leaves your Mac. An LLM via [OpenRouter](https://openrouter.ai) cleans up the transcript: fixing punctuation, removing filler words, preserving your tone. Total API cost runs around $0.30/month at typical daily use: 50x cheaper than Wispr Flow ($15/month). Latency is 2-3 seconds end-to-end, comparable to Wispr Flow and significantly faster than other open-source alternatives that run Whisper on CPU.
+Transcription runs on-device via [mlx-whisper](https://github.com/ml-explore/mlx-examples), so no audio ever leaves your Mac. An LLM cleans up the transcript: fixing punctuation, removing filler words, preserving your tone. Polishing runs via [Groq](https://groq.com) by default (~200ms, 5–6x faster than OpenRouter) or any [OpenRouter](https://openrouter.ai) model as fallback. Total API cost runs around $0.30/month at typical daily use: 50x cheaper than Wispr Flow ($15/month). Latency is 1–2 seconds end-to-end, faster than Wispr Flow and significantly faster than other open-source alternatives that run Whisper on CPU.
 
 ![macOS 13+](https://img.shields.io/badge/macOS-13%2B-black) ![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-required-red)
 
@@ -13,13 +13,13 @@ Transcription runs on-device via [mlx-whisper](https://github.com/ml-explore/mlx
 ## How it works
 
 ```
-hold hotkey → record → release → transcribe (on-device) → polish (OpenRouter) → paste
+hold hotkey → record → release → transcribe (on-device) → polish (Groq) → paste
 ```
 
 - **Backend**: Python + FastAPI, runs locally on port 8765
 - **Frontend**: SwiftUI menu-bar app, floating pill indicator, global hotkey
 - **Transcription**: mlx-whisper (Whisper small, Apple Silicon optimised, ~400ms)
-- **Polishing**: Any OpenRouter model (default: `google/gemini-2.5-flash-lite`, ~1s)
+- **Polishing**: Groq (default: `llama-3.1-8b-instant`, ~200ms) or any OpenRouter model (~1s)
 
 ---
 
@@ -28,7 +28,7 @@ hold hotkey → record → release → transcribe (on-device) → polish (OpenRo
 - macOS 13 Ventura or later, Apple Silicon (M1/M2/M3/M4)
 - Python 3.12
 - Xcode Command Line Tools
-- An [OpenRouter](https://openrouter.ai) API key
+- A [Groq](https://console.groq.com) API key (recommended) or an [OpenRouter](https://openrouter.ai) API key
 
 Install Xcode CLT if you don't have it:
 
@@ -51,7 +51,15 @@ pip install -e .
 
 First run downloads the Whisper model (~150 MB) to your Hugging Face cache.
 
-Create `~/.murmur/config.json` and add your OpenRouter key:
+Create `~/.murmur/config.json` and add your API key. Groq is recommended for speed:
+
+```json
+{
+  "groq_api_key": "gsk_..."
+}
+```
+
+Or use OpenRouter as fallback:
 
 ```json
 {
@@ -59,9 +67,11 @@ Create `~/.murmur/config.json` and add your OpenRouter key:
 }
 ```
 
-Or set it as an environment variable:
+Or set via environment variables:
 
 ```bash
+export GROQ_API_KEY=gsk_...
+# or
 export OPENROUTER_API_KEY=sk-or-...
 ```
 
@@ -125,8 +135,9 @@ Config file: `~/.murmur/config.json`
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `openrouter_api_key` | `""` | Your OpenRouter API key |
-| `polishing_model` | `google/gemini-2.5-flash-lite` | Any OpenRouter model ID |
+| `groq_api_key` | `""` | Groq API key (recommended, ~200ms) |
+| `openrouter_api_key` | `""` | OpenRouter API key (fallback, ~1s) |
+| `polishing_model` | `llama-3.1-8b-instant` | Model ID for polishing |
 | `whisper_model` | `mlx-community/whisper-small-mlx` | mlx-whisper model |
 | `polishing_prompt` | *(built-in)* | System prompt for polishing |
 
@@ -141,7 +152,7 @@ murmur/
 │   │   ├── server.py  # HTTP endpoints
 │   │   ├── audio.py   # Recording + RMS level
 │   │   ├── transcribe.py
-│   │   └── polish.py  # OpenRouter client
+│   │   └── polish.py  # Groq / OpenRouter client
 │   └── pyproject.toml
 └── mac/               # SwiftUI app
     ├── Sources/Murmur/
