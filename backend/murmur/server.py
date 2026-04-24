@@ -97,20 +97,8 @@ def stop_recording() -> TranscriptResponse:
     _recorder = None
     t_stop = time.perf_counter()
 
-    # Skip transcription for very short clips — Whisper hallucinates on < 0.5s of audio
-    sample_rate = _cfg["sample_rate"]
-    audio_duration_s = len(audio) / sample_rate if len(audio) > 0 else 0
-    if audio_duration_s < 0.5:
-        return TranscriptResponse(raw="", polished="", elapsed_ms={"stop": 0, "transcribe": 0, "polish": 0, "clipboard": 0, "total": 0})
-
     raw = transcribe(audio, model=_cfg["whisper_model"], sample_rate=_cfg["sample_rate"])
     t_trans = time.perf_counter()
-
-    # Sanity check: Whisper hallucinates long text from short audio.
-    # If transcript has far more words than the audio duration could contain, discard it.
-    max_plausible_words = int(audio_duration_s * 4)  # ~240 wpm upper bound
-    if len(raw.split()) > max_plausible_words:
-        raw = ""
 
     groq_key = _cfg.get("groq_api_key", "")
     polish_key = groq_key if groq_key else _cfg.get("openrouter_api_key", "")
