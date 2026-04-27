@@ -72,6 +72,16 @@ final class BackendProcess {
         task = nil
     }
 
+    /// Non-blocking SIGKILL. Use from menu actions where the main thread cannot
+    /// afford to wait — e.g. when the backend is mid-transcribe and ignoring
+    /// SIGTERM. The OS reaps the orphan; next launch's pkill cleans any leftovers.
+    func kill() {
+        guard let proc = task, proc.isRunning else { return }
+        proc.terminationHandler = nil
+        Darwin.kill(proc.processIdentifier, SIGKILL)
+        task = nil
+    }
+
     private func shellEscape(_ path: String) -> String {
         "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }

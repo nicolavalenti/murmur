@@ -160,7 +160,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func forceQuit() {
-        backend.stop()
+        // SIGKILL + immediate exit. Avoids waitUntilExit() blocking the main
+        // thread when the backend is mid-transcribe (the very state where users
+        // need force-quit most). Spinning wheel on the menu is gone.
+        backend.kill()
         exit(0)
     }
 }

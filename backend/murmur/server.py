@@ -1,3 +1,4 @@
+import re
 import time
 from typing import Any
 
@@ -9,6 +10,7 @@ from . import config as config_module
 from .audio import Recorder
 from .polish import polish, GROQ_URL
 from .transcribe import transcribe
+from .vad import trim_silence
 
 app = FastAPI(title="murmur", version="0.1.0")
 
@@ -33,6 +35,21 @@ class SettingsPatch(BaseModel):
     hotkey: str | None = None
     sample_rate: int | None = None
     input_gain: float | None = None
+    language: str | None = None
+    vocabulary: list[str] | None = None
+    substitutions: dict[str, str] | None = None
+    polish_min_chars: int | None = None
+
+
+def _apply_substitutions(text: str, subs: dict[str, str] | None) -> str:
+    """Whole-word, case-insensitive replacement. \\b boundaries mean 'slash' in
+    'slashing' is left alone. Longest keys first so multi-word entries (e.g.
+    'forward slash') win over their shorter prefixes."""
+    if not subs or not text:
+        return text
+    for word in sorted(subs.keys(), key=len, reverse=True):
+        text = re.sub(rf"\b{re.escape(word)}\b", subs[word], text, flags=re.IGNORECASE)
+    return text
 
 
 @app.get("/status")
@@ -97,19 +114,38 @@ def stop_recording() -> TranscriptResponse:
     _recorder = None
     t_stop = time.perf_counter()
 
-    raw = transcribe(audio, model=_cfg["whisper_model"], sample_rate=_cfg["sample_rate"])
+    original_samples = audio.size
+    audio = trim_silence(audio, sample_rate=_cfg["sample_rate"])
+    trim_ratio = audio.size / max(1, original_samples)
+    t_vad = time.perf_counter()
+
+    raw = transcribe(
+        audio,
+        model=_cfg["whisper_model"],
+        sample_rate=_cfg["sample_rate"],
+        language=_cfg.get("language", "en"),
+        vocabulary=_cfg.get("vocabulary") or None,
+    )
     t_trans = time.perf_counter()
 
-    groq_key = _cfg.get("groq_api_key", "")
-    polish_key = groq_key if groq_key else _cfg.get("openrouter_api_key", "")
-    polish_url = GROQ_URL if groq_key else None
-    polished = polish(
-        raw,
-        model=_cfg.get("polishing_model") or None,
-        api_key=polish_key,
-        prompt=_cfg["polishing_prompt"],
-        **{"url": polish_url} if polish_url else {},
-    )
+    polish_min_chars = int(_cfg.get("polish_min_chars", 0) or 0)
+    polish_skipped = len(raw.strip()) < polish_min_chars
+    if polish_skipped:
+        polished = raw
+    else:
+        groq_key = _cfg.get("groq_api_key", "")
+        polish_key = groq_key if groq_key else _cfg.get("openrouter_api_key", "")
+        polish_url = GROQ_URL if groq_key else None
+        polished = polish(
+            raw,
+            model=_cfg.get("polishing_model") or None,
+            api_key=polish_key,
+            prompt=_cfg["polishing_prompt"],
+            **{"url": polish_url} if polish_url else {},
+        )
+    # Substitutions go after polish so the LLM never sees raw symbols (which
+    # could confuse small models) and can't undo our replacements.
+    polished = _apply_substitutions(polished, _cfg.get("substitutions"))
     t_polish = time.perf_counter()
 
     try:
@@ -120,14 +156,17 @@ def stop_recording() -> TranscriptResponse:
 
     elapsed = {
         "stop": int((t_stop - t0) * 1000),
-        "transcribe": int((t_trans - t_stop) * 1000),
+        "vad": int((t_vad - t_stop) * 1000),
+        "transcribe": int((t_trans - t_vad) * 1000),
         "polish": int((t_polish - t_trans) * 1000),
         "clipboard": int((t_clip - t_polish) * 1000),
         "total": int((t_clip - t0) * 1000),
     }
+    polish_label = f"polish: {elapsed['polish']}ms" + (" (skipped)" if polish_skipped else "")
     log_line = (
+        f"vad: {elapsed['vad']}ms (kept {trim_ratio*100:.0f}%)  "
         f"transcribe: {elapsed['transcribe']}ms  "
-        f"polish: {elapsed['polish']}ms  "
+        f"{polish_label}  "
         f"total: {elapsed['total']}ms\n"
     )
     print(f"[murmur] timing — {log_line}", end="")

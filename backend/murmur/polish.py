@@ -17,11 +17,14 @@ def polish(transcript: str, model: str | None, api_key: str, prompt: str, timeou
     if not transcript.strip():
         return transcript
 
+    # Wrap the transcript in delimiters so the model treats it as data to clean,
+    # not as an instruction to follow. Critical for small models (e.g. llama-3.1-8b)
+    # that otherwise "helpfully" answer questions found inside the transcript.
     body = {
         "model": model,
         "messages": [
             {"role": "system", "content": prompt},
-            {"role": "user", "content": transcript},
+            {"role": "user", "content": f"<transcript>\n{transcript}\n</transcript>"},
         ],
     }
     headers = {
