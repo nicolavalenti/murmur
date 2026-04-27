@@ -21,6 +21,13 @@ hold hotkey → record → release → transcribe (on-device) → polish (Groq) 
 - **Transcription**: mlx-whisper (Whisper small, Apple Silicon optimised, ~400ms)
 - **Polishing**: Groq (default: `llama-3.1-8b-instant`, ~200ms) or any OpenRouter model (~1s)
 
+### Speed optimisations
+
+- **VAD silence trim** — leading/trailing silence is cut before transcription. Saves ~20–28% on 20s+ clips (measured: 30s → ~22s of audio sent to Whisper).
+- **Skip polish on short clips** — transcripts under `polish_min_chars` (default 30) skip the LLM round-trip entirely. Saves ~150–200ms on one-line replies; Whisper already punctuates short utterances reasonably well.
+- **Vocabulary biasing** — proper nouns and jargon (e.g. `Nordic Loop`, `Claude Code`) hint the Whisper decoder toward correct spellings via `initial_prompt`.
+- **Word substitutions** — whole-word, case-insensitive replacements applied after polish (e.g. `slash` → `/`).
+
 ---
 
 ## Requirements
@@ -140,6 +147,10 @@ Config file: `~/.murmur/config.json`
 | `polishing_model` | `llama-3.1-8b-instant` | Model ID for polishing |
 | `whisper_model` | `mlx-community/whisper-small-mlx` | mlx-whisper model |
 | `polishing_prompt` | *(built-in)* | System prompt for polishing |
+| `language` | `en` | Whisper language code (pin to avoid misdetection) |
+| `vocabulary` | `["Nordic Loop", "Claude Code"]` | Phrases biased into Whisper's decoder |
+| `substitutions` | `{"slash": "/"}` | Whole-word replacements applied after polish |
+| `polish_min_chars` | `30` | Skip polish LLM call below this transcript length (0 = always polish) |
 
 ---
 

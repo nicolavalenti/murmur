@@ -49,9 +49,17 @@ Murmur is two separate processes: a Python FastAPI server and a SwiftUI menu-bar
 ```
 hold hotkey → startRecording() → POST /start_recording
 speak       → GET /level (polled 20Hz) → waveform amplitude
-release     → POST /stop_recording → transcribe (mlx-whisper) → polish (OpenRouter) → JSON
+release     → POST /stop_recording → VAD trim → transcribe (mlx-whisper)
+             → polish (Groq, skipped on short clips) → substitutions → JSON
              Swift sets clipboard (NSPasteboard) → reactivates original app → simulates ⌘V
 ```
+
+### Pipeline stages (post-stop)
+
+- **VAD trim** (`vad.py`) — RMS-based leading/trailing silence cut, 50ms windows, adaptive threshold (5% of peak + 0.005 floor), 200ms padding. Pure numpy. Saves ~20–28% transcribe time on 20s+ clips. Bench: `backend/bench_vad.py`.
+- **Whisper** — pinned to `language` (default `"en"`) to prevent misdetection. `vocabulary` list is passed via `initial_prompt` for soft biasing.
+- **Polish** — skipped when transcript is shorter than `polish_min_chars` (default 30). Transcript wrapped in `<transcript>...</transcript>` tags so smaller models (llama-3.1-8b-instant) don't answer questions inside the recording.
+- **Substitutions** — applied after polish so the LLM never sees the symbol form. Whole-word, case-insensitive, longest-key-first.
 
 ### Python backend (`backend/murmur/`)
 
