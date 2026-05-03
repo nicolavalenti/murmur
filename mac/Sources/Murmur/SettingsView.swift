@@ -52,10 +52,23 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            VStack(alignment: .leading, spacing: 6) {
+                Toggle(isOn: $store.useClipboardContext) {
+                    Text("Use clipboard as context")
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                Text("When on, the text on your clipboard at recording start is sent to the polishing model so it can correct misheard names. Turn off if your clipboard often holds sensitive text.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             Spacer(minLength: 0)
         }
         .padding(24)
-        .frame(width: 420, height: 380)
+        .frame(width: 420, height: 460)
         .onAppear { store.refreshModel() }
     }
 }

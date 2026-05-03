@@ -10,6 +10,7 @@ struct BackendSettings: Decodable {
     let polishing_model: String?
     let whisper_model: String?
     let input_gain: Double?
+    let use_clipboard_context: Bool?
 }
 
 /// Talks to the Python FastAPI backend running on localhost:8765.
@@ -40,10 +41,16 @@ actor BackendClient {
         throw lastError ?? NSError(domain: NSURLErrorDomain, code: NSURLErrorCannotConnectToHost)
     }
 
-    func stopRecording() async throws -> TranscriptResponse {
+    func stopRecording(context: String? = nil) async throws -> TranscriptResponse {
         var req = URLRequest(url: base.appendingPathComponent("stop_recording"))
         req.httpMethod = "POST"
         req.timeoutInterval = 30.0  // backend crash shouldn't freeze the app for 60s
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // Always send a body so the backend's optional StopRequest parses cleanly.
+        let payload: [String: String?] = ["context": context]
+        req.httpBody = try JSONSerialization.data(
+            withJSONObject: payload.compactMapValues { $0 }
+        )
         let (data, response) = try await session.data(for: req)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             let body = String(data: data, encoding: .utf8) ?? "<non-utf8>"
@@ -58,6 +65,23 @@ actor BackendClient {
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = try JSONEncoder().encode(["input_gain": gain])
+        _ = try await session.data(for: req)
+    }
+
+    /// Asks the backend to abort an in-flight /stop_recording. Best-effort —
+    /// if no stop is running, the backend returns {"cancelled": false}.
+    func cancel() async {
+        var req = URLRequest(url: base.appendingPathComponent("cancel"))
+        req.httpMethod = "POST"
+        req.timeoutInterval = 2.0
+        _ = try? await session.data(for: req)
+    }
+
+    func updateUseClipboardContext(_ enabled: Bool) async throws {
+        var req = URLRequest(url: base.appendingPathComponent("settings"))
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONEncoder().encode(["use_clipboard_context": enabled])
         _ = try await session.data(for: req)
     }
 

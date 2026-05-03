@@ -9,6 +9,7 @@ def transcribe(
     sample_rate: int = 16000,
     language: str = "en",
     vocabulary: list[str] | None = None,
+    extra_vocabulary: list[str] | None = None,
 ) -> str:
     """Run mlx-whisper on an in-memory float32 mono array.
 
@@ -25,10 +26,19 @@ def transcribe(
 
     audio = audio.astype(np.float32, copy=False)
     kwargs: dict = {"path_or_hf_repo": model, "language": language}
-    if vocabulary:
+    # Merge static vocab with per-call extras (e.g. proper nouns extracted from
+    # clipboard context). Dedupe while preserving order so static items come first.
+    merged: list[str] = []
+    seen: set[str] = set()
+    for word in (vocabulary or []) + (extra_vocabulary or []):
+        key = word.lower()
+        if key not in seen:
+            seen.add(key)
+            merged.append(word)
+    if merged:
         # initial_prompt seeds Whisper's decoder context. The model treats it as
         # "what was said just before this audio," which biases spelling and word
         # choice without forcing it. Phrased as a sentence so it parses naturally.
-        kwargs["initial_prompt"] = "Vocabulary includes: " + ", ".join(vocabulary) + "."
+        kwargs["initial_prompt"] = "Vocabulary includes: " + ", ".join(merged) + "."
     result = mlx_whisper.transcribe(audio, **kwargs)
     return (result.get("text") or "").strip()

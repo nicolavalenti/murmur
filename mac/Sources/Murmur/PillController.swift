@@ -25,6 +25,9 @@ final class PillController: ObservableObject {
     // Clipboard snapshot taken at the moment recording starts — while the source
     // app is still frontmost and lazy providers can still materialise their data.
     private var savedClipboard: [(NSPasteboard.PasteboardType, Data)] = []
+    // String form of the clipboard at startRecording, sent to the backend as
+    // context so the LLM can correct misheard proper nouns.
+    private var clipboardContext: String?
     // True only after backend confirmed recording started. Guards against
     // sending stop when start never completed (rapid press, start error, etc.)
     private var backendIsRecording = false
@@ -46,6 +49,11 @@ final class PillController: ObservableObject {
         savedClipboard = (pb.types ?? []).compactMap { type in
             pb.data(forType: type).map { (type, $0) }
         }
+        // Honor the user's privacy toggle. Read from UserDefaults directly so
+        // PillController doesn't need to depend on SettingsStore. Default true
+        // matches the backend default and the value seeded at SettingsStore init.
+        let ctxEnabled = UserDefaults.standard.object(forKey: "context.useClipboard") as? Bool ?? true
+        clipboardContext = ctxEnabled ? pb.string(forType: .string) : nil
 
         state = .recording(since: Date())
         show()
@@ -85,7 +93,7 @@ final class PillController: ObservableObject {
             }
             self.backendIsRecording = false
             do {
-                let result = try await self.backend.stopRecording()
+                let result = try await self.backend.stopRecording(context: self.clipboardContext)
                 if let t = result.elapsed_ms {
                     print("[murmur] swift received — transcribe: \(t["transcribe"] ?? -1)ms  polish: \(t["polish"] ?? -1)ms  total: \(t["total"] ?? -1)ms")
                 }
@@ -117,6 +125,35 @@ final class PillController: ObservableObject {
                 self.setError("stop failed: \(error.localizedDescription)")
             }
         }
+    }
+
+    /// Discard the in-flight transcription (e.g. user pressed the hotkey while
+    /// processing). Cancels the local stop task and restores the clipboard.
+    /// The backend may still finish its work — it's synchronous and we can't
+    /// interrupt the polish HTTP call from the client side — but the result is
+    /// dropped on arrival because stopTask is cancelled.
+    func cancelProcessing() {
+        guard case .processing = state else { return }
+        stopTask?.cancel()
+        watchdog?.cancel()
+        levelPoller?.cancel()
+        backendIsRecording = false
+        // Tell the backend to abort its in-flight transcribe + polish so it can
+        // accept a new /start_recording immediately. Fire-and-forget — the local
+        // UI reset below shouldn't wait on this network round trip.
+        Task { [backend] in await backend.cancel() }
+        // Restore the clipboard snapshot taken at recording start, in case the
+        // stop task got far enough to overwrite it before being cancelled.
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        if !savedClipboard.isEmpty {
+            let types = savedClipboard.map { $0.0 }
+            pb.declareTypes(types, owner: nil)
+            for (type, data) in savedClipboard {
+                pb.setData(data, forType: type)
+            }
+        }
+        hide()
     }
 
     private func startLevelPolling() {

@@ -37,6 +37,13 @@ DEFAULTS: dict[str, Any] = {
     # Whole-word, case-insensitive replacements applied AFTER polish.
     # Always-on: "slash" anywhere in your speech becomes "/". Add carefully.
     "substitutions": {"slash": "/"},
+    # When true, the Swift app sends the current clipboard text with /stop_recording.
+    # The backend extracts proper nouns to bias Whisper, and passes the snippet to
+    # the polish LLM as reference for fixing misheard names. Set false for privacy.
+    "use_clipboard_context": True,
+    # Cap clipboard context size before sending to the polish LLM (token cost) and
+    # to keep Whisper's initial_prompt focused. 0 disables the cap.
+    "context_max_chars": 4000,
 }
 
 

@@ -3,6 +3,7 @@
 Press Enter to start recording. Press Enter again to stop. Polished text is
 printed and copied to the clipboard.
 """
+import asyncio
 import sys
 import time
 
@@ -34,12 +35,12 @@ def run_once(cfg: dict) -> None:
 
     if cfg.get("polishing_model") and cfg.get("openrouter_api_key"):
         print("… polishing via OpenRouter")
-        polished = polish(
+        polished = asyncio.run(polish(
             raw,
             model=cfg["polishing_model"],
             api_key=cfg["openrouter_api_key"],
             prompt=cfg["polishing_prompt"],
-        )
+        ))
     else:
         print("  (skipping polish — no model or API key set)")
         polished = raw

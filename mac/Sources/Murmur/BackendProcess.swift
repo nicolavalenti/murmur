@@ -67,8 +67,20 @@ final class BackendProcess {
     func stop() {
         guard let proc = task, proc.isRunning else { return }
         proc.terminationHandler = nil  // prevent auto-restart on intentional quit
-        proc.terminate()
-        proc.waitUntilExit()
+        proc.terminate()  // SIGTERM — gives uvicorn a chance to shut down cleanly
+
+        // Bounded wait. If the backend is mid-transcribe (mlx-whisper running in
+        // a worker thread that ignores signals), waitUntilExit() would hang the
+        // main UI thread for the full transcribe duration — that's the spinning
+        // wheel on quit. Poll for ~1.5s, then SIGKILL. The OS releases the mic
+        // when the process dies, and next launch's pkill -9 sweeps any orphans.
+        let deadline = Date().addingTimeInterval(1.5)
+        while proc.isRunning && Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        if proc.isRunning {
+            Darwin.kill(proc.processIdentifier, SIGKILL)
+        }
         task = nil
     }
 

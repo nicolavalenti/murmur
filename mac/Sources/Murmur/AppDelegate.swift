@@ -73,6 +73,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         stopGraceTask?.cancel()
         stopGraceTask = nil
 
+        // If we're mid-processing (waiting on transcribe + polish), treat any
+        // hotkey press as a cancel. Backend is synchronous and can't be
+        // interrupted, but we drop the result on the Swift side and reset the UI
+        // so the user isn't stuck staring at a spinner.
+        if case .processing = pillController.state {
+            recordingMode = .none
+            pillController.cancelProcessing()
+            return
+        }
+
         switch recordingMode {
         case .toggle:
             // Single press stops hands-free recording.

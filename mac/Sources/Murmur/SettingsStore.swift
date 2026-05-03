@@ -23,6 +23,17 @@ final class SettingsStore: ObservableObject {
             Task { try? await backend.updateGain(inputGain) }
         }
     }
+    /// When true, the clipboard text at recording start is sent to the backend
+    /// as context for proper-noun correction. Suppress flag prevents the didSet
+    /// from POSTing back to the backend when we're just hydrating from /settings.
+    @Published var useClipboardContext: Bool {
+        didSet {
+            UserDefaults.standard.set(useClipboardContext, forKey: "context.useClipboard")
+            guard !suppressBackendSync else { return }
+            Task { try? await backend.updateUseClipboardContext(useClipboardContext) }
+        }
+    }
+    private var suppressBackendSync = false
 
     private let backend = BackendClient()
 
@@ -42,6 +53,7 @@ final class SettingsStore: ObservableObject {
             self.modifiers = [.control, .option]
         }
         self.inputGain = defaults.object(forKey: "input.gain") as? Double ?? 1.0
+        self.useClipboardContext = defaults.object(forKey: "context.useClipboard") as? Bool ?? true
     }
 
     func refreshModel() {
@@ -54,7 +66,11 @@ final class SettingsStore: ObservableObject {
                 do {
                     let s = try await self.backend.getSettings()
                     self.polishingModel = s.polishing_model ?? "—"
+                    // Hydrate from backend without triggering POST-back loops.
+                    self.suppressBackendSync = true
+                    defer { self.suppressBackendSync = false }
                     if let gain = s.input_gain { self.inputGain = gain }
+                    if let ctx = s.use_clipboard_context { self.useClipboardContext = ctx }
                     return
                 } catch {
                     if i == delays.count - 1 {
