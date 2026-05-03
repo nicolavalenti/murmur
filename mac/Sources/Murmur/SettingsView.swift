@@ -17,15 +17,6 @@ struct SettingsView: View {
 
             Divider()
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Polishing model")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
-                Text(store.polishingModel)
-                    .font(.system(.body, design: .monospaced))
-                    .textSelection(.enabled)
-            }
-
             VStack(alignment: .leading, spacing: 8) {
                 Text("Transcription")
                     .font(.system(size: 11, weight: .medium))
@@ -58,9 +49,9 @@ struct SettingsView: View {
                 .labelsHidden()
                 Text(store.polishingBackend == "off"
                      ? "Polish disabled. Raw Whisper output is pasted as-is."
-                     : store.polishingBackend == "auto"
-                     ? "Uses Groq if a Groq key is set, otherwise OpenRouter."
-                     : "Routes polish calls to \(store.polishingBackend == "groq" ? "Groq" : "OpenRouter").")
+                     : store.polishingBackend == "openrouter"
+                     ? "Uses \(store.polishingModel) via OpenRouter."
+                     : "Uses \(store.polishingModel) via Groq\(store.polishingBackend == "auto" ? " (auto-detected from API key)" : "").")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -108,7 +99,7 @@ struct SettingsView: View {
             Spacer(minLength: 0)
         }
         .padding(24)
-        .frame(width: 420, height: 600)
+        .frame(width: 420, height: 560)
         .onAppear { store.refreshModel() }
     }
 }
