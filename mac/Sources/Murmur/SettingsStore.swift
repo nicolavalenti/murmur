@@ -17,6 +17,18 @@ final class SettingsStore: ObservableObject {
         didSet { UserDefaults.standard.set(Int(modifiers.rawValue), forKey: "hotkey.modifiers") }
     }
     @Published var polishingModel: String = "—"
+    @Published var transcriptionBackend: String = "local" {
+        didSet {
+            guard !suppressBackendSync else { return }
+            Task { try? await backend.updateTranscriptionBackend(transcriptionBackend) }
+        }
+    }
+    @Published var polishingBackend: String = "auto" {
+        didSet {
+            guard !suppressBackendSync else { return }
+            Task { try? await backend.updatePolishingBackend(polishingBackend) }
+        }
+    }
     @Published var inputGain: Double {
         didSet {
             UserDefaults.standard.set(inputGain, forKey: "input.gain")
@@ -71,6 +83,8 @@ final class SettingsStore: ObservableObject {
                     defer { self.suppressBackendSync = false }
                     if let gain = s.input_gain { self.inputGain = gain }
                     if let ctx = s.use_clipboard_context { self.useClipboardContext = ctx }
+                    if let tb = s.transcription_backend { self.transcriptionBackend = tb }
+                    if let pb = s.polishing_backend { self.polishingBackend = pb }
                     return
                 } catch {
                     if i == delays.count - 1 {

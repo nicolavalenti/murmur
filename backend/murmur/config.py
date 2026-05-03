@@ -41,6 +41,12 @@ DEFAULTS: dict[str, Any] = {
     # The backend extracts proper nouns to bias Whisper, and passes the snippet to
     # the polish LLM as reference for fixing misheard names. Set false for privacy.
     "use_clipboard_context": True,
+    # "local" runs mlx-whisper on-device. "groq" sends audio to Groq's Whisper API
+    # (requires groq_api_key) — same latency, higher accuracy (full large-v3).
+    "transcription_backend": "local",
+    # "auto" uses Groq if groq_api_key is set, else OpenRouter, else skips polish.
+    # "groq" / "openrouter" force a specific provider. "off" disables polish entirely.
+    "polishing_backend": "auto",
     # Cap clipboard context size before sending to the polish LLM (token cost) and
     # to keep Whisper's initial_prompt focused. 0 disables the cap.
     "context_max_chars": 4000,

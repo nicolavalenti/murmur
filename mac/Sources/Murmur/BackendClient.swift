@@ -11,6 +11,8 @@ struct BackendSettings: Decodable {
     let whisper_model: String?
     let input_gain: Double?
     let use_clipboard_context: Bool?
+    let transcription_backend: String?
+    let polishing_backend: String?
 }
 
 /// Talks to the Python FastAPI backend running on localhost:8765.
@@ -82,6 +84,22 @@ actor BackendClient {
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = try JSONEncoder().encode(["use_clipboard_context": enabled])
+        _ = try await session.data(for: req)
+    }
+
+    func updateTranscriptionBackend(_ value: String) async throws {
+        var req = URLRequest(url: base.appendingPathComponent("settings"))
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONEncoder().encode(["transcription_backend": value])
+        _ = try await session.data(for: req)
+    }
+
+    func updatePolishingBackend(_ value: String) async throws {
+        var req = URLRequest(url: base.appendingPathComponent("settings"))
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONEncoder().encode(["polishing_backend": value])
         _ = try await session.data(for: req)
     }
 

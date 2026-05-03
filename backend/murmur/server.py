@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from . import config as config_module
 from .audio import Recorder
 from .polish import polish, GROQ_URL
-from .transcribe import transcribe
+from .transcribe import transcribe, transcribe_groq
 from .vad import trim_silence
 
 app = FastAPI(title="murmur", version="0.1.0")
@@ -91,6 +91,8 @@ class SettingsPatch(BaseModel):
     polish_min_chars: int | None = None
     use_clipboard_context: bool | None = None
     context_max_chars: int | None = None
+    transcription_backend: str | None = None
+    polishing_backend: str | None = None
 
 
 def _apply_substitutions(text: str, subs: dict[str, str] | None) -> str:
@@ -199,33 +201,51 @@ async def stop_recording(body: StopRequest | None = None) -> TranscriptResponse:
     context_nouns = _extract_proper_nouns(raw_context)
 
     try:
-        # mlx-whisper is CPU/GPU bound and synchronous. Running it directly here
-        # would block the event loop for the full transcribe duration (often
-        # multiple seconds), defeating the point of going async. We dispatch to
-        # the dedicated single-worker pool so concurrent /stop_recording calls
-        # serialise instead of stomping each other in Metal (which SIGABRTs).
-        loop = asyncio.get_running_loop()
-        raw = await loop.run_in_executor(
-            _transcribe_pool,
-            lambda: transcribe(
+        tb = _cfg.get("transcription_backend", "local")
+        if tb == "groq":
+            # Groq Whisper API: async network call, no Metal — runs directly on
+            # the event loop without blocking it. No need for run_in_executor.
+            raw = await transcribe_groq(
                 audio,
-                model=_cfg["whisper_model"],
+                api_key=_cfg.get("groq_api_key", ""),
                 sample_rate=_cfg["sample_rate"],
                 language=_cfg.get("language", "en"),
                 vocabulary=_cfg.get("vocabulary") or None,
                 extra_vocabulary=context_nouns or None,
-            ),
-        )
+            )
+        else:
+            # mlx-whisper is CPU/GPU bound and synchronous. Dispatch to the
+            # dedicated single-worker pool so concurrent calls serialise instead
+            # of stomping each other in Metal (which SIGABRTs).
+            loop = asyncio.get_running_loop()
+            raw = await loop.run_in_executor(
+                _transcribe_pool,
+                lambda: transcribe(
+                    audio,
+                    model=_cfg["whisper_model"],
+                    sample_rate=_cfg["sample_rate"],
+                    language=_cfg.get("language", "en"),
+                    vocabulary=_cfg.get("vocabulary") or None,
+                    extra_vocabulary=context_nouns or None,
+                ),
+            )
         t_trans = time.perf_counter()
 
         polish_min_chars = int(_cfg.get("polish_min_chars", 0) or 0)
-        polish_skipped = len(raw.strip()) < polish_min_chars
+        pb = _cfg.get("polishing_backend", "auto")
+        polish_skipped = len(raw.strip()) < polish_min_chars or pb == "off"
         if polish_skipped:
             polished = raw
         else:
             groq_key = _cfg.get("groq_api_key", "")
-            polish_key = groq_key if groq_key else _cfg.get("openrouter_api_key", "")
-            polish_url = GROQ_URL if groq_key else None
+            or_key = _cfg.get("openrouter_api_key", "")
+            if pb == "groq":
+                polish_key, polish_url = groq_key, GROQ_URL
+            elif pb == "openrouter":
+                polish_key, polish_url = or_key, None
+            else:  # "auto": prefer Groq if key present, else OpenRouter
+                polish_key = groq_key if groq_key else or_key
+                polish_url = GROQ_URL if groq_key else None
             polished = await polish(
                 raw,
                 model=_cfg.get("polishing_model") or None,

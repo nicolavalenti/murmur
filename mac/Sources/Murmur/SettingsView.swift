@@ -27,6 +27,46 @@ struct SettingsView: View {
             }
 
             VStack(alignment: .leading, spacing: 8) {
+                Text("Transcription")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Picker("Transcription", selection: $store.transcriptionBackend) {
+                    Text("Local (on-device)").tag("local")
+                    Text("Groq API").tag("groq")
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                Text(store.transcriptionBackend == "groq"
+                     ? "Uses whisper-large-v3 via Groq. Requires a Groq API key. Same latency, higher accuracy than local turbo."
+                     : "Runs mlx-whisper on your Mac. No internet required.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Polishing")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Picker("Polishing", selection: $store.polishingBackend) {
+                    Text("Auto").tag("auto")
+                    Text("Groq").tag("groq")
+                    Text("OpenRouter").tag("openrouter")
+                    Text("Off").tag("off")
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                Text(store.polishingBackend == "off"
+                     ? "Polish disabled. Raw Whisper output is pasted as-is."
+                     : store.polishingBackend == "auto"
+                     ? "Uses Groq if a Groq key is set, otherwise OpenRouter."
+                     : "Routes polish calls to \(store.polishingBackend == "groq" ? "Groq" : "OpenRouter").")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
                 Text("Hotkey")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.secondary)
@@ -68,7 +108,7 @@ struct SettingsView: View {
             Spacer(minLength: 0)
         }
         .padding(24)
-        .frame(width: 420, height: 460)
+        .frame(width: 420, height: 600)
         .onAppear { store.refreshModel() }
     }
 }
