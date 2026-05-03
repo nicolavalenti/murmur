@@ -19,7 +19,7 @@ hold hotkey → record → release → transcribe → polish → paste
 - **Backend**: Python + FastAPI, runs locally on port 8765
 - **Frontend**: SwiftUI menu-bar app, floating pill indicator, global hotkey
 - **Transcription**: local mlx-whisper (on-device, ~400ms) or Groq `whisper-large-v3` API (~300ms, higher accuracy)
-- **Polishing**: Groq (default: `llama-3.1-8b-instant`, ~200ms), any OpenRouter model (~1s), or off
+- **Polishing**: Groq (default: `meta-llama/llama-4-scout-17b-16e-instruct`, ~200ms), any OpenRouter model (~1s), or off
 
 ### Speed optimisations
 
@@ -146,7 +146,7 @@ Config file: `~/.murmur/config.json`
 | `openrouter_api_key` | `""` | OpenRouter API key (polish fallback) |
 | `transcription_backend` | `local` | `local` (mlx-whisper on-device) or `groq` (Groq Whisper API) |
 | `polishing_backend` | `auto` | `auto` (Groq if key set, else OpenRouter), `groq`, `openrouter`, or `off` |
-| `polishing_model` | `llama-3.1-8b-instant` | Model ID for polishing |
+| `polishing_model` | `meta-llama/llama-4-scout-17b-16e-instruct` | Model ID for polishing |
 | `whisper_model` | `mlx-community/whisper-small-mlx` | mlx-whisper model (local backend only) |
 | `polishing_prompt` | *(built-in)* | System prompt for polishing |
 | `language` | `en` | Whisper language code (pin to avoid misdetection) |
