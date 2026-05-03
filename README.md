@@ -2,7 +2,7 @@
 
 AI-powered push-to-talk dictation for macOS (Apple Silicon). Hold a hotkey, speak, release. Polished text lands wherever your cursor is.
 
-Transcription runs on-device via [mlx-whisper](https://github.com/ml-explore/mlx-examples), so no audio ever leaves your Mac. An LLM cleans up the transcript: fixing punctuation, removing filler words, preserving your tone. Polishing runs via [Groq](https://groq.com) by default (~200ms, 5–6x faster than OpenRouter) or any [OpenRouter](https://openrouter.ai) model as fallback. Total API cost runs around $0.30/month at typical daily use: 50x cheaper than Wispr Flow ($15/month). Latency is 1–2 seconds end-to-end, faster than Wispr Flow and significantly faster than other open-source alternatives that run Whisper on CPU.
+Transcription runs either on-device via [mlx-whisper](https://github.com/ml-explore/mlx-examples) (no audio leaves your Mac) or via [Groq](https://groq.com)'s Whisper API (higher accuracy, same latency). An LLM cleans up the transcript: fixing punctuation, removing filler words, preserving your tone. Polishing runs via Groq by default (~200ms) or any [OpenRouter](https://openrouter.ai) model as fallback, and can be disabled entirely. Both backends are switchable from the Settings window. Total API cost runs around $0.30/month at typical daily use: 50x cheaper than Wispr Flow ($15/month). Latency is 1–2 seconds end-to-end.
 
 ![macOS 13+](https://img.shields.io/badge/macOS-13%2B-black) ![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-required-red)
 
@@ -13,13 +13,13 @@ Transcription runs on-device via [mlx-whisper](https://github.com/ml-explore/mlx
 ## How it works
 
 ```
-hold hotkey → record → release → transcribe (on-device) → polish (Groq) → paste
+hold hotkey → record → release → transcribe → polish → paste
 ```
 
 - **Backend**: Python + FastAPI, runs locally on port 8765
 - **Frontend**: SwiftUI menu-bar app, floating pill indicator, global hotkey
-- **Transcription**: mlx-whisper (Whisper small, Apple Silicon optimised, ~400ms)
-- **Polishing**: Groq (default: `llama-3.1-8b-instant`, ~200ms) or any OpenRouter model (~1s)
+- **Transcription**: local mlx-whisper (on-device, ~400ms) or Groq `whisper-large-v3` API (~300ms, higher accuracy)
+- **Polishing**: Groq (default: `llama-3.1-8b-instant`, ~200ms), any OpenRouter model (~1s), or off
 
 ### Speed optimisations
 
@@ -142,10 +142,12 @@ Config file: `~/.murmur/config.json`
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `groq_api_key` | `""` | Groq API key (recommended, ~200ms) |
-| `openrouter_api_key` | `""` | OpenRouter API key (fallback, ~1s) |
+| `groq_api_key` | `""` | Groq API key — used for transcription (if Groq backend) and polishing |
+| `openrouter_api_key` | `""` | OpenRouter API key (polish fallback) |
+| `transcription_backend` | `local` | `local` (mlx-whisper on-device) or `groq` (Groq Whisper API) |
+| `polishing_backend` | `auto` | `auto` (Groq if key set, else OpenRouter), `groq`, `openrouter`, or `off` |
 | `polishing_model` | `llama-3.1-8b-instant` | Model ID for polishing |
-| `whisper_model` | `mlx-community/whisper-small-mlx` | mlx-whisper model |
+| `whisper_model` | `mlx-community/whisper-small-mlx` | mlx-whisper model (local backend only) |
 | `polishing_prompt` | *(built-in)* | System prompt for polishing |
 | `language` | `en` | Whisper language code (pin to avoid misdetection) |
 | `vocabulary` | `["Nordic Loop", "Claude Code"]` | Phrases biased into Whisper's decoder |
