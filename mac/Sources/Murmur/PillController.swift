@@ -93,7 +93,11 @@ final class PillController: ObservableObject {
             }
             self.backendIsRecording = false
             do {
-                let result = try await self.backend.stopRecording(context: self.clipboardContext)
+                let result = try await self.backend.stopRecording(
+                    context: self.clipboardContext,
+                    appBundleID: self.targetApp?.bundleIdentifier,
+                    appName: self.targetApp?.localizedName
+                )
                 if let t = result.elapsed_ms {
                     print("[murmur] swift received — transcribe: \(t["transcribe"] ?? -1)ms  polish: \(t["polish"] ?? -1)ms  total: \(t["total"] ?? -1)ms")
                 }

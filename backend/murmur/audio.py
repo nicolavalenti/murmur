@@ -87,3 +87,25 @@ class Recorder:
         if recent.size == 0:
             return 0.0
         return float(np.sqrt(np.mean(recent * recent)))
+
+    def total_samples(self) -> int:
+        """Total samples captured so far, callable mid-recording. Used by the
+        streaming transcriber to detect when a new chunk is ready to slice."""
+        with self._lock:
+            return sum(int(f.size) for f in self._frames)
+
+    def slice(self, start: int, end: int) -> np.ndarray:
+        """Return samples in the half-open interval [start, end). Safe to call
+        while recording — copies under the lock to avoid races with the audio
+        callback. Used by the streaming transcriber to peel off chunks."""
+        with self._lock:
+            if not self._frames:
+                return np.zeros(0, dtype=np.float32)
+            # Single concat under the lock is the simplest correct option.
+            # O(N) per call; acceptable because chunk_interval_s caps how often
+            # this fires (typically every 2s of recording).
+            full = np.concatenate(self._frames, axis=0)
+        end = min(end, int(full.size))
+        if start >= end:
+            return np.zeros(0, dtype=np.float32)
+        return full[start:end].copy()

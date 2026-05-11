@@ -43,13 +43,21 @@ actor BackendClient {
         throw lastError ?? NSError(domain: NSURLErrorDomain, code: NSURLErrorCannotConnectToHost)
     }
 
-    func stopRecording(context: String? = nil) async throws -> TranscriptResponse {
+    func stopRecording(
+        context: String? = nil,
+        appBundleID: String? = nil,
+        appName: String? = nil
+    ) async throws -> TranscriptResponse {
         var req = URLRequest(url: base.appendingPathComponent("stop_recording"))
         req.httpMethod = "POST"
         req.timeoutInterval = 30.0  // backend crash shouldn't freeze the app for 60s
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         // Always send a body so the backend's optional StopRequest parses cleanly.
-        let payload: [String: String?] = ["context": context]
+        let payload: [String: String?] = [
+            "context": context,
+            "app_bundle_id": appBundleID,
+            "app_name": appName,
+        ]
         req.httpBody = try JSONSerialization.data(
             withJSONObject: payload.compactMapValues { $0 }
         )
